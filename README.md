@@ -26,6 +26,9 @@
  From your machine with permissions to create resources in your AWS account run the following commands;
   - "cd" into the folder on the local machine.
   - Run "./deploy.sh up" to provision the resources. Please be patient the resource provisioning could take some time, once complete you will see the message "stack create complete".
+### Run
+  From the stack output section of ApacheWS-Cfn-ec2 find ALB endpoint. Use the endpoint on browser to run.
+  Note:- If the browser displays webpage not found. Wait for a few minutes for the load balancer to mark EC2 as healthy.
 ### Destroy
  Once you are happy with the stacks and no longer require them or the resources run the following command; 
   - Run "./deploy.sh down" to trigger deletion. This could also take long, when complete you will see the message "stack delete complete".
