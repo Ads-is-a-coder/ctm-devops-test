@@ -1,0 +1,640 @@
+
+Description: AWS Cloudformation script to deploy a VPC and it's associated resources
+
+Parameters:
+
+  VPCOctet:
+    Description: First two octets of the VPC
+    Type: String
+    MinLength: '4'
+    MaxLength: '7'
+    AllowedPattern: "[0-9]{2,3}.[0-9]{1,3}"
+    Default: 10.0
+    ConstraintDescription: must only be the first two octets without a trailing period
+
+  DomainName:
+    Type: String
+    Description: Domain name
+    Default: vpc.local
+
+  DNSServers:
+    Default: AmazonProvidedDNS
+    Type: CommaDelimitedList
+    Description: Comma separated list of DNS server IP addresses
+
+  Name:
+    Description: Name Tag
+    Type: String
+    MinLength: '3'
+    MaxLength: '255'
+    Default: vpc
+
+  Service:
+    Description: Service Tag
+    Type: String
+    MinLength: '3'
+    MaxLength: '255'
+    Default: Website
+    
+  Environment:
+    Description: Environment Tag
+    Type: String
+    MinLength: '3'
+    MaxLength: '255'
+    AllowedValues:
+      - Dev
+      - UAT
+      - Production
+    Default: Dev
+
+Mappings:
+  SubnetConfig:
+    VPC:
+      CIDR: 0.0/16
+    PublicA:
+      CIDR: 0.0/24
+    PublicB:
+      CIDR: 1.0/24
+    PublicC:
+      CIDR: 2.0/24
+    WebA:
+      CIDR: 3.0/24
+    WebB:
+      CIDR: 4.0/24
+    WebC:
+      CIDR: 5.0/24
+    AppA:
+      CIDR: 6.0/24
+    AppB:
+      CIDR: 7.0/24
+    AppC:
+      CIDR: 8.0/24
+  AvailabilityZones:
+    ap-southeast-2:
+      ZoneA: ap-southeast-2a
+      ZoneB: ap-southeast-2b
+      ZoneC: ap-southeast-2c
+    
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: VPC Configurations
+      Parameters:
+      - VPCOctet
+    - Label:
+        default: Domain Configurations
+      Parameters:
+      - DomainName
+      - DNSServers
+    - Label:
+        default: Tagging Configurations
+      Parameters:
+      - Name
+      - Environment
+      - Service
+
+Resources:
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock:
+        Fn::Join:
+        - "."
+        - - Ref: VPCOctet
+          - Fn::FindInMap:
+            - SubnetConfig
+            - VPC
+            - CIDR
+      InstanceTenancy: default
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+      - Key: Name
+        Value: !Ref Name
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  SubnetPublicA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock:
+        Fn::Join:
+        - "."
+        - - Ref: VPCOctet
+          - Fn::FindInMap:
+            - SubnetConfig
+            - PublicA
+            - CIDR
+      AvailabilityZone:
+        Fn::FindInMap:
+        - AvailabilityZones
+        - Ref: AWS::Region
+        - ZoneA
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: Public A
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  SubnetPublicB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock:
+        Fn::Join:
+        - "."
+        - - Ref: VPCOctet
+          - Fn::FindInMap:
+            - SubnetConfig
+            - PublicB
+            - CIDR
+      AvailabilityZone:
+        Fn::FindInMap:
+        - AvailabilityZones
+        - Ref: AWS::Region
+        - ZoneB
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: Public B
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  SubnetPublicC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock:
+        Fn::Join:
+        - "."
+        - - Ref: VPCOctet
+          - Fn::FindInMap:
+            - SubnetConfig
+            - PublicC
+            - CIDR
+      AvailabilityZone:
+        Fn::FindInMap:
+        - AvailabilityZones
+        - Ref: AWS::Region
+        - ZoneC
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: Public C
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  SubnetWebA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock:
+        Fn::Join:
+        - "."
+        - - Ref: VPCOctet
+          - Fn::FindInMap:
+            - SubnetConfig
+            - WebA
+            - CIDR
+      AvailabilityZone:
+        Fn::FindInMap:
+        - AvailabilityZones
+        - Ref: AWS::Region
+        - ZoneA
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: Web A
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  SubnetWebB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock:
+        Fn::Join:
+        - "."
+        - - Ref: VPCOctet
+          - Fn::FindInMap:
+            - SubnetConfig
+            - WebB
+            - CIDR
+      AvailabilityZone:
+        Fn::FindInMap:
+        - AvailabilityZones
+        - Ref: AWS::Region
+        - ZoneB
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: Web B
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  SubnetWebC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock:
+        Fn::Join:
+        - "."
+        - - Ref: VPCOctet
+          - Fn::FindInMap:
+            - SubnetConfig
+            - WebC
+            - CIDR
+      AvailabilityZone:
+        Fn::FindInMap:
+        - AvailabilityZones
+        - Ref: AWS::Region
+        - ZoneC
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: Web C
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+
+  SubnetAppA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock:
+        Fn::Join:
+        - "."
+        - - Ref: VPCOctet
+          - Fn::FindInMap:
+            - SubnetConfig
+            - AppA
+            - CIDR
+      AvailabilityZone:
+        Fn::FindInMap:
+        - AvailabilityZones
+        - Ref: AWS::Region
+        - ZoneA
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: App A
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  SubnetAppB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock:
+        Fn::Join:
+        - "."
+        - - Ref: VPCOctet
+          - Fn::FindInMap:
+            - SubnetConfig
+            - AppB
+            - CIDR
+      AvailabilityZone:
+        Fn::FindInMap:
+        - AvailabilityZones
+        - Ref: AWS::Region
+        - ZoneB
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: App B
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  SubnetAppC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock:
+        Fn::Join:
+        - "."
+        - - Ref: VPCOctet
+          - Fn::FindInMap:
+            - SubnetConfig
+            - AppC
+            - CIDR
+      AvailabilityZone:
+        Fn::FindInMap:
+        - AvailabilityZones
+        - Ref: AWS::Region
+        - ZoneC
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: App C
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref VPCIGW
+
+  NAT:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+        - EIP
+        - AllocationId
+      SubnetId:
+        Ref: SubnetPublicA
+      Tags:
+      - Key: Name
+        Value: NAT
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+  EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc 
+
+  WebRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref WebRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NAT
+
+  ApplicationRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref AppRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NAT
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: Public
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  WebRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: Web
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  AppRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: App
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  VPCIGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: IGW
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  AttachIGWtoVPC:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref VPCIGW
+
+  FlowLogs:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      DeliverLogsPermissionArn: !Sub 'arn:aws:iam::${AWS::AccountId}:role/flowlogsRole'
+      LogGroupName: FlowLogsGroup
+      ResourceId: !Ref VPC
+      ResourceType: VPC
+      TrafficType: ALL
+
+  VPCDHCP:
+    Type: AWS::EC2::DHCPOptions
+    Properties:
+      DomainName: !Ref DomainName
+      DomainNameServers: !Ref DNSServers
+      Tags:
+      - Key: Name
+        Value: DHCP Option Set
+      - Key: Service
+        Value: !Ref Service
+      - Key: Environment
+        Value: !Ref Environment
+
+  AssocVPCDHCPtoVPC:
+    Type: AWS::EC2::VPCDHCPOptionsAssociation
+    Properties:
+      VpcId: !Ref VPC
+      DhcpOptionsId: !Ref VPCDHCP
+
+
+  AssocSubnetPublicAtoPublicRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref SubnetPublicA
+  AssocSubnetPublicBtoPublicRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref SubnetPublicB
+  AssocSubnetPublicCtoPublicRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref SubnetPublicC
+
+  AssocSubnetWebAtoWebRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref WebRouteTable
+      SubnetId: !Ref SubnetWebA
+  AssocSubnetWebBtoWebRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref WebRouteTable
+      SubnetId: !Ref SubnetWebB
+  AssocSubnetWebCtoWebRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref WebRouteTable
+      SubnetId: !Ref SubnetWebC
+
+  AssocSubnetAppAtoAppRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref AppRouteTable
+      SubnetId: !Ref SubnetAppA
+  AssocSubnetAppBtoAppRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref AppRouteTable
+      SubnetId: !Ref SubnetAppB
+  AssocSubnetAppCtoAppRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref AppRouteTable
+      SubnetId: !Ref SubnetAppC
+
+  S3VPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      RouteTableIds:
+        - !Ref AppRouteTable
+        - !Ref WebRouteTable
+        - !Ref PublicRouteTable
+      ServiceName: com.amazonaws.ap-southeast-2.s3
+      VpcId: !Ref VPC
+
+Outputs:
+
+  VPCID:
+    Value: !Ref VPC
+    Description: ID of the VPC deployed
+    Export:
+      Name: !Sub "${AWS::StackName}-VpcId"
+
+  VPCCIDR:
+    Value:
+      Fn::Join:
+      - "."
+      - - Ref: VPCOctet
+        - Fn::FindInMap:
+          - SubnetConfig
+          - VPC
+          - CIDR
+    Description: CIDR of the VPC deployed
+
+  IGWID:
+    Value: !Ref VPCIGW
+    Description: IGW ID for the VPC
+
+  PublicSubnetIDs:
+    Value:
+      Fn::Join:
+      - ","
+      - - Ref: SubnetPublicA
+        - Ref: SubnetPublicB
+        - Ref: SubnetPublicC
+    Description: Comma separated list of Public subnets
+  
+  PublicSubnetA:
+    Value: !Ref SubnetPublicA
+    Description: The Single Public Subnet in AZ A for Export values
+    Export:
+      Name: !Sub "${AWS::StackName}-SubnetPublicA"
+
+  PublicSubnetB:
+    Value: !Ref SubnetPublicB
+    Description: The Single Public Subnet in AZ B for Export values
+    Export:
+      Name: !Sub "${AWS::StackName}-SubnetPublicB"
+
+  PublicSubnetC:
+    Value: !Ref SubnetPublicC
+    Description: The Single Public Subnet in AZ C for Export values
+    Export:
+      Name: !Sub "${AWS::StackName}-SubnetPublicC"
+
+  WebSubnetA:
+    Value: !Ref SubnetWebA
+    Description: The Single Web Subnet in AZ A for Export values
+    Export:
+      Name: !Sub "${AWS::StackName}-SubnetWebA"
+
+  WebSubnetB:
+    Value: !Ref SubnetWebB
+    Description: The Single Web Subnet in AZ B for Export values
+    Export:
+      Name: !Sub "${AWS::StackName}-SubnetWebB"
+  
+  WebSubnetC:
+    Value: !Ref SubnetWebC
+    Description: The Single Web Subnet in AZ C for Export values
+    Export:
+      Name: !Sub "${AWS::StackName}-SubnetWebC"
+
+  WebSubnetIDs:
+    Value:
+      Fn::Join:
+      - ","
+      - - Ref: SubnetWebA
+        - Ref: SubnetWebB
+        - Ref: SubnetWebC
+    Description: Comma separated list of Web subnets
+
+  AppSubnetIDs:
+    Value:
+      Fn::Join:
+      - ","
+      - - Ref: SubnetAppA
+        - Ref: SubnetAppB
+        - Ref: SubnetAppC
+    Description: Comma separated list of Application subnets
+
+  PublicRouteTable:
+    Value:
+      Ref: PublicRouteTable
+    Description: The Public Route Table
+
+  WebRuteTable:
+    Value:
+      Ref: WebRouteTable
+    Description: The Web Route Table
+
+  ApplicationTable:
+    Value:
+      Ref: AppRouteTable
+    Description: The Application Route Table

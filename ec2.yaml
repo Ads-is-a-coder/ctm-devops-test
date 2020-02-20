@@ -1,0 +1,319 @@
+
+Description: AWS CloudFormation Template to create a Linux Web Server and affiliated resources
+
+Parameters:
+
+  InstanceType:
+    Description: Custom Server EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+    - t2.micro
+    - t2.small
+    - t2.medium
+  
+  VPCStackName:
+    Type: String 
+    Description: The name of the VPC Stack to import values from 
+    Default: ApacheWS-Cfn-vpc
+
+  ImageId:
+    Description: The Id of the AMI
+    Type: AWS::EC2::Image::Id
+    Default: ami-0dc96254d5535925f
+
+  Name:
+    Description: Name Tag
+    Type: String
+    MinLength: '3'
+    MaxLength: '255'
+    Default: WebServer
+
+  Service:
+    Description: Service Tag
+    Type: String
+    MinLength: '3'
+    MaxLength: '255'
+    Default: Website
+    
+  Environment:
+    Description: Environment Tag
+    Type: String
+    MinLength: '3'
+    MaxLength: '255'
+    AllowedValues:
+      - Dev
+      - UAT
+      - Production
+    Default: Dev
+
+  AmazonEC2RoleforSSMARN:
+    Description: The IAM ARN for the AWS Policy AmazonEC2RoleforSSM
+    Type: String
+    Default: arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+
+  AWSCloudFormationReadOnlyAccessARN:
+    Description: The IAM ARN for the AWS Policy CloudFormationReadOnlyAccess
+    Type: String
+    Default: arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess
+
+  CloudWatchFullAccessARN:
+    Description: The IAM ARN for the AWS Policy CloudWatchFullAccess
+    Type: String
+    Default: arn:aws:iam::aws:policy/CloudWatchFullAccess
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: AWS Policies
+        Parameters:
+          - AmazonEC2RoleforSSMARN
+          - AWSCloudFormationReadOnlyAccessARN
+          - CloudWatchFullAccessARN
+      - Label:
+          default: EC2 Configuration
+        Parameters:
+          - InstanceType
+          - ImageId
+      - Label:
+          default: Tagging Configurations
+        Parameters:
+          - Name
+          - Environment
+          - Service
+
+Mappings:
+  AvailabilityZones:
+    ap-southeast-2:
+      ZoneA: ap-southeast-2a
+      ZoneB: ap-southeast-2b
+      ZoneC: ap-southeast-2c
+
+Resources:
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      CrossZone: true
+      HealthCheck:
+        HealthyThreshold: '2'
+        Interval: '10'
+        Target: HTTP:80/index.html
+        Timeout: '5'
+        UnhealthyThreshold: '5'
+      Listeners:
+      - InstancePort: '80'
+        InstanceProtocol: HTTP
+        LoadBalancerPort: '80'
+        Protocol: HTTP
+      LoadBalancerName: !Sub ${Name}-LoadBalancer
+      Scheme: internet-facing
+      SecurityGroups: 
+        - !Ref ELBSecurityGroup
+      Subnets: 
+      - Fn::ImportValue: !Sub "${VPCStackName}-SubnetPublicA"
+      - Fn::ImportValue: !Sub "${VPCStackName}-SubnetPublicB"
+      - Fn::ImportValue: !Sub "${VPCStackName}-SubnetPublicC"
+      Tags:
+      - Key: Name
+        Value: !Ref Name
+      - Key: Service 
+        Value: !Ref Service 
+      - Key: Environment
+        Value: !Ref Environment
+
+  ELBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${Name}-${Service}-${Environment}-ELB-SecurityGroup
+      GroupDescription: The Security Group responsible for the custom server
+      VpcId: 
+        Fn::ImportValue: !Sub "${VPCStackName}-VpcId"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-ELBSG
+        - Key: Service
+          Value: The service tag to apply to the security group
+        - Key: Environment
+          Value: The environment tag to apply to the security group
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${Name}-${Service}-${Environment}-SecurityGroup
+      GroupDescription: The Security Group responsible for the custom server
+      VpcId:
+        Fn::ImportValue: !Sub "${VPCStackName}-VpcId"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ELBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref ELBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${Name}-${Service}-SecurityGroup
+        - Key: Service
+          Value: The service tag to apply to the security group
+        - Key: Environment
+          Value: The environment tag to apply to the security group
+
+  IAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${Name}-${Service}-${Environment}-Role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - !Ref AmazonEC2RoleforSSMARN
+        - !Ref AWSCloudFormationReadOnlyAccessARN
+        - !Ref CloudWatchFullAccessARN
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+        - Ref: IAMRole
+
+  AutoscalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AvailabilityZones:
+        - Fn::FindInMap:
+            - AvailabilityZones
+            - Ref: AWS::Region
+            - ZoneA
+        - Fn::FindInMap:
+            - AvailabilityZones
+            - Ref: AWS::Region
+            - ZoneB
+        - Fn::FindInMap:
+            - AvailabilityZones
+            - Ref: AWS::Region
+            - ZoneC
+      HealthCheckType: EC2
+      LaunchConfigurationName: !Ref LaunchConfiguration
+      LoadBalancerNames: 
+        - !Ref LoadBalancer
+      MaxSize: "2"
+      MinSize: "0"
+      DesiredCapacity: "2"
+      Tags:
+        - Key: Name
+          PropagateAtLaunch: true
+          Value: !Ref Name
+        - Key: Service
+          PropagateAtLaunch: true
+          Value: !Ref Service
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Sub "${VPCStackName}-SubnetWebA"
+        - Fn::ImportValue: !Sub "${VPCStackName}-SubnetWebB"
+        - Fn::ImportValue: !Sub "${VPCStackName}-SubnetWebC"
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MaxBatchSize: 1
+        MinInstancesInService: 1
+        PauseTime: PT15M
+        WaitOnResourceSignals: true
+
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      SecurityGroups:
+        - Ref: SecurityGroup
+      UserData:
+        "Fn::Base64": !Sub |
+          #!/bin/bash
+          yum install -y aws-cfn-bootstrap
+          /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource LaunchConfiguration
+          /opt/aws/bin/cfn-signal -e $? --region ${AWS::Region} --stack ${AWS::StackName} --resource AutoScalingGroup
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          commands:
+            01-install-apache:
+              command: sudo yum install httpd -y
+            02-start-apache:
+              command: sudo /usr/sbin/apachectl start
+            03-allow-apache:
+              command: sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+            04-user:
+              command: "sudo usermod -a -G apache ec2-user"
+            05-chown:
+              command: "sudo chown -R ec2-user:apache /var/www"
+            06-chmod:
+              command: "sudo chmod 2777 /var/www"
+            07-adjust-again:
+              command: "curl -o /var/www/html/index.html http://169.254.169.254/latest/meta-data/instance-id"
+            08-restart-apache:
+              command: sudo /usr/sbin/apachectl restart              
+
+
+          files:
+            "/etc/cfn/cfn-hup.conf":
+              mode: 000400
+              owner: root
+              group: root
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+
+            "/etc/cfn/hooks.d/cfn-auto-reloader.conf":
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.ContainerInstances.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource LaunchConfiguration
+
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+
+Outputs:
+
+  Address:
+    Value: !GetAtt LoadBalancer.DNSName
+    
